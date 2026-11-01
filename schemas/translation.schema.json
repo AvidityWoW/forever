@@ -1200,6 +1200,9 @@
 						},
 						"reforge_settings": {
 							"type": "string"
+						},
+						"item_swap": {
+							"type": "string"
 						}
 					},
 					"additionalProperties": false,
@@ -1218,8 +1221,21 @@
 						"other_settings",
 						"buffs",
 						"debuffs",
-						"reforge_settings"
+						"reforge_settings",
+						"item_swap"
 					]
+				},
+				"preset_link": {
+					"type": "object",
+					"properties": {
+						"title": { "type": "string" },
+						"description": { "type": "string" },
+						"load": { "type": "string" },
+						"not_found": { "type": "string" },
+						"already_loaded": { "type": "string" }
+					},
+					"additionalProperties": false,
+					"required": ["title", "description", "load", "not_found", "already_loaded"]
 				},
 				"dungeon_difficulties": {
 					"type": "object",
@@ -1644,6 +1660,7 @@
 				"list_picker",
 				"precision",
 				"preset",
+				"preset_link",
 				"dungeon_difficulties",
 				"rep_levels",
 				"stat_cap_types",

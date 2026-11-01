@@ -43,100 +43,105 @@ export function buildCategories(build: PresetBuild): Array<string> {
 	return [...new Set(categories)].sort();
 }
 
+/** A part of a build that its load can change, named by its `common.preset` label key. */
+export type BuildPart =
+	| 'gear'
+	| 'item_swap'
+	| 'talents'
+	| 'rotation'
+	| 'stat_weights'
+	| 'encounter'
+	| 'class_spec_options'
+	| 'consumables'
+	| 'buffs'
+	| 'debuffs'
+	| 'other_settings';
+
+export const BUILD_PARTS: ReadonlyArray<BuildPart> = [
+	'gear',
+	'item_swap',
+	'talents',
+	'rotation',
+	'stat_weights',
+	'encounter',
+	'class_spec_options',
+	'consumables',
+	'buffs',
+	'debuffs',
+	'other_settings',
+];
+
 /**
  * Whether the live settings already match the build, scoped to the categories the picker showing
  * the chip cares about: a gear-tab chip lights up on gear alone, even when the build also carries
  * talents the player has not loaded.
  */
-export function isBuildActive(
+export function isBuildActive(build: PresetBuild, simUI: IndividualSimHost<Spec>, categories?: Array<PresetConfigurationCategory>): boolean {
+	return buildDifferences(build, simUI, categories).length === 0;
+}
+
+/** The parts of the build the live settings differ from, in a fixed order; a part the build leaves out never differs. */
+export function buildDifferences(
 	{ gear, rotation, rotationType, talents, epWeights, encounter, settings }: PresetBuild,
 	simUI: IndividualSimHost<Spec>,
 	categories?: Array<PresetConfigurationCategory>,
-): boolean {
+): Array<BuildPart> {
 	const checks = (category: PresetConfigurationCategory) => !categories || categories.includes(category);
+	const differs = new Set<BuildPart>();
 
-	const hasGear = checks(PresetConfigurationCategory.Gear) && gear ? EquipmentSpec.equals(gear.gear, simUI.player.getGear().asSpec()) : true;
-	const hasTalents =
-		checks(PresetConfigurationCategory.Talents) && talents
-			? SavedTalents.equals(talents.data, SavedTalents.create({ talentsString: simUI.player.getTalentsString() }))
-			: true;
+	if (checks(PresetConfigurationCategory.Gear) && gear && !EquipmentSpec.equals(gear.gear, simUI.player.getGear().asSpec())) differs.add('gear');
+	if (
+		checks(PresetConfigurationCategory.Talents) &&
+		talents &&
+		!SavedTalents.equals(talents.data, SavedTalents.create({ talentsString: simUI.player.getTalentsString() }))
+	)
+		differs.add('talents');
 
-	let hasRotation = true;
 	if (checks(PresetConfigurationCategory.Rotation)) {
 		if (rotationType) {
-			hasRotation = rotationType === simUI.player.getRotationType();
+			if (rotationType !== simUI.player.getRotationType()) differs.add('rotation');
 		} else if (rotation?.rotation.rotation) {
-			hasRotation = isEqualAPLRotation(simUI.player, simUI.player.getResolvedAplRotation(), rotation.rotation.rotation);
+			if (!isEqualAPLRotation(simUI.player, simUI.player.getResolvedAplRotation(), rotation.rotation.rotation)) differs.add('rotation');
 		}
 	}
 
-	const hasEpWeights = checks(PresetConfigurationCategory.EPWeights) && epWeights ? simUI.player.getEpWeights().equals(epWeights.epWeights) : true;
+	if (checks(PresetConfigurationCategory.EPWeights) && epWeights && !simUI.player.getEpWeights().equals(epWeights.epWeights)) differs.add('stat_weights');
 
-	let hasEncounter = true;
-	let hasHealingModel = true;
 	if (checks(PresetConfigurationCategory.Encounter)) {
-		hasEncounter = encounter?.encounter
-			? Encounter.equals({ ...encounter.encounter, apiVersion: 0 }, { ...simUI.sim.encounter.toProto(), apiVersion: 0 })
-			: true;
-		hasHealingModel = encounter?.healingModel ? HealingModel.equals(encounter.healingModel, simUI.player.getHealingModel()) : true;
+		if (encounter?.encounter && !Encounter.equals({ ...encounter.encounter, apiVersion: 0 }, { ...simUI.sim.encounter.toProto(), apiVersion: 0 }))
+			differs.add('encounter');
+		if (encounter?.healingModel && !HealingModel.equals(encounter.healingModel, simUI.player.getHealingModel())) differs.add('encounter');
 	}
 
-	let hasRace = true;
-	let hasProfession1 = true;
-	let hasProfession2 = true;
-	let hasDistanceFromTarget = true;
-	let hasEnableItemSwap = true;
-	let hasItemSwap = true;
-	let hasSpecOptions = true;
-	let hasConsumables = true;
-	let hasPartyBuffs = true;
-	let hasRaidBuffs = true;
-	let hasBuffs = true;
-	let hasDebuffs = true;
 	if (checks(PresetConfigurationCategory.Settings)) {
-		hasRace = settings?.race ? simUI.player.getRace() === settings.race : true;
-		hasProfession1 = settings?.playerOptions?.profession1 === undefined || simUI.player.getProfession1() === settings.playerOptions.profession1;
-		hasProfession2 = settings?.playerOptions?.profession2 === undefined || simUI.player.getProfession2() === settings.playerOptions.profession2;
-		hasDistanceFromTarget =
-			settings?.playerOptions?.distanceFromTarget === undefined || simUI.player.getDistanceFromTarget() === settings.playerOptions.distanceFromTarget;
-		hasEnableItemSwap =
-			settings?.playerOptions?.enableItemSwap === undefined ||
-			simUI.player.itemSwapSettings.getEnableItemSwap() === settings.playerOptions.enableItemSwap;
-		hasItemSwap =
-			settings?.playerOptions?.itemSwap === undefined ||
-			(!settings?.playerOptions?.enableItemSwap && !simUI.player.itemSwapSettings.getEnableItemSwap()) ||
-			isEqualItemSwap(simUI.player.itemSwapSettings.toProto(), settings.playerOptions.itemSwap);
-		hasSpecOptions =
-			settings?.specOptions && Object.keys(settings.specOptions).length
-				? JSON.stringify(simUI.player.getSpecOptions()) == JSON.stringify(settings.specOptions)
-				: true;
-		hasConsumables = settings?.consumables ? ConsumesSpec.equals(simUI.player.getConsumes(), settings.consumables) : true;
-		hasPartyBuffs = settings?.partyBuffs ? PartyBuffs.equals(simUI.player.getParty()?.getBuffs(), settings.partyBuffs) : true;
-		hasRaidBuffs = settings?.raidBuffs ? RaidBuffs.equals(simUI.sim.raid.getBuffs(), settings.raidBuffs) : true;
-		hasBuffs = settings?.buffs ? IndividualBuffs.equals(simUI.player.getBuffs(), settings.buffs) : true;
-		hasDebuffs = settings?.debuffs ? Debuffs.equals(simUI.sim.raid.getDebuffs(), settings.debuffs) : true;
+		const playerOptions = settings?.playerOptions;
+		if (settings?.race && simUI.player.getRace() !== settings.race) differs.add('other_settings');
+		if (playerOptions?.profession1 !== undefined && simUI.player.getProfession1() !== playerOptions.profession1) differs.add('other_settings');
+		if (playerOptions?.profession2 !== undefined && simUI.player.getProfession2() !== playerOptions.profession2) differs.add('other_settings');
+		if (playerOptions?.distanceFromTarget !== undefined && simUI.player.getDistanceFromTarget() !== playerOptions.distanceFromTarget)
+			differs.add('other_settings');
+		if (playerOptions?.enableItemSwap !== undefined && simUI.player.itemSwapSettings.getEnableItemSwap() !== playerOptions.enableItemSwap)
+			differs.add('item_swap');
+		if (
+			playerOptions?.itemSwap !== undefined &&
+			(playerOptions.enableItemSwap || simUI.player.itemSwapSettings.getEnableItemSwap()) &&
+			!isEqualItemSwap(simUI.player.itemSwapSettings.toProto(), playerOptions.itemSwap)
+		)
+			differs.add('item_swap');
+		if (
+			settings?.specOptions &&
+			Object.keys(settings.specOptions).length &&
+			JSON.stringify(simUI.player.getSpecOptions()) != JSON.stringify(settings.specOptions)
+		)
+			differs.add('class_spec_options');
+		if (settings?.consumables && !ConsumesSpec.equals(simUI.player.getConsumes(), settings.consumables)) differs.add('consumables');
+		if (settings?.partyBuffs && !PartyBuffs.equals(simUI.player.getParty()?.getBuffs(), settings.partyBuffs)) differs.add('buffs');
+		if (settings?.raidBuffs && !RaidBuffs.equals(simUI.sim.raid.getBuffs(), settings.raidBuffs)) differs.add('buffs');
+		if (settings?.buffs && !IndividualBuffs.equals(simUI.player.getBuffs(), settings.buffs)) differs.add('buffs');
+		if (settings?.debuffs && !Debuffs.equals(simUI.sim.raid.getDebuffs(), settings.debuffs)) differs.add('debuffs');
 	}
 
-	return (
-		hasGear &&
-		hasTalents &&
-		hasRotation &&
-		hasEpWeights &&
-		hasEncounter &&
-		hasHealingModel &&
-		hasRace &&
-		hasProfession1 &&
-		hasProfession2 &&
-		hasDistanceFromTarget &&
-		hasEnableItemSwap &&
-		hasItemSwap &&
-		hasSpecOptions &&
-		hasConsumables &&
-		hasPartyBuffs &&
-		hasRaidBuffs &&
-		hasBuffs &&
-		hasDebuffs
-	);
+	return BUILD_PARTS.filter(part => differs.has(part));
 }
 
 /**

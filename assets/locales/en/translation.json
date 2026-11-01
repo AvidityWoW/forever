@@ -343,7 +343,15 @@
 			"other_settings": "Other Settings",
 			"buffs": "Buffs",
 			"debuffs": "Debuffs",
-			"reforge_settings": "Enchants Optimizer Settings"
+			"reforge_settings": "Enchants Optimizer Settings",
+			"item_swap": "Item Swap"
+		},
+		"preset_link": {
+			"title": "Load preset “{{name}}”?",
+			"description": "Loading it replaces these settings. Untick any you want to keep.",
+			"load": "Load",
+			"not_found": "No preset named “{{name}}”.",
+			"already_loaded": "Preset “{{name}}” is already loaded."
 		},
 		"dungeon_difficulties": {
 			"unknown": "Unknown",

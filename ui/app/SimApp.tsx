@@ -12,6 +12,7 @@ import { trackPageView } from '../tracking/utils';
 import { CrashReportDialog } from './CrashReportDialog';
 import { SimHostObject } from './individual_sim_ui';
 import { knownIssuesFor } from './known_issues';
+import { PresetLinkDialog } from './PresetLinkDialog';
 import { SettingsDialog } from './SettingsDialog';
 import { SimShell } from './SimShell';
 import { ONBOARDING_STORAGE_KEY } from './storage_keys';
@@ -61,6 +62,7 @@ export const SimApp = <SpecType extends Spec>({ player, def }: SimAppProps<SpecT
 								<CrashReportDialog opener={simUI.crashReport} />
 								<EpWeightsDialog open={epWeightsOpen} onOpenChange={setEpWeightsOpen} settings={simUI.statWeightActionSettings} />
 								<SettingsDialog open={settingsOpen} onOpenChange={setSettingsOpen} host={simUI} />
+								<PresetLinkDialog />
 							</>
 						)}
 					</OpenEpWeightsContext>
